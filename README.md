@@ -129,4 +129,4 @@ Raw datasets and virtualenvs are **not** committed (see `.gitignore` files). The
 Philly trace is © Microsoft Research (research use); download it via
 `ml/src/download_dataset.py`.
 
-🤖 Built with [Claude Code](https://claude.com/claude-code)
+
