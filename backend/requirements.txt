@@ -1,0 +1,8 @@
+# MINDSource backend — Phase 1B foundation
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+SQLAlchemy==2.0.52
+pydantic==2.13.5
+
+# Test/dev only (FastAPI TestClient uses httpx)
+httpx==0.28.1
