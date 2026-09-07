@@ -7,7 +7,12 @@ export function SimulationBadge({
   label = "SIMULATION",
   className,
 }: {
-  label?: "SIMULATION" | "DEMO" | "DEMO DECISION" | "SIMULATED RECOMMENDATION";
+  label?:
+    | "SIMULATION"
+    | "WHAT-IF SIMULATION"
+    | "DEMO"
+    | "DEMO DECISION"
+    | "SIMULATED RECOMMENDATION";
   className?: string;
 }) {
   return (

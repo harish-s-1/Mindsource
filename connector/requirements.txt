@@ -1,0 +1,7 @@
+# MINDSource NVIDIA GPU connector — no third-party dependencies.
+#
+# The connector deliberately uses only the Python standard library
+# (subprocess, urllib, json, logging, socket, datetime). This keeps the
+# telemetry agent small, auditable, and low-risk to run on customer hardware.
+#
+# Requires Python 3.9+ and a working `nvidia-smi` on PATH.

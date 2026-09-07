@@ -1,0 +1,7 @@
+# MINDSource ML pipeline (Phase 3A/3B) — offline training + evaluation.
+# Inference in the FastAPI backend needs only numpy + xgboost (see backend).
+numpy>=1.26
+pandas>=2.2
+scikit-learn>=1.4
+xgboost>=2.0
+pyarrow>=15        # only needed for the Alibaba v2026 Parquet path (see README)

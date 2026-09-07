@@ -1,19 +1,27 @@
+"use client";
+
+import { useCallback } from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { PageHeader, MetaItem } from "@/components/ui/PageHeader";
+import { Panel } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { SimulationBadge } from "@/components/ui/SimulationBadge";
+import { ApiErrorState, ApiLoadingState } from "@/components/ui/ApiState";
 import { WorkloadsView } from "@/components/workloads/WorkloadsView";
-import { getWorkloads } from "@/lib/mock-data";
+import { getWorkloads } from "@/lib/api";
+import { useApiResource } from "@/lib/hooks/useApiResource";
 
 export default function WorkloadsPage() {
-  const workloads = getWorkloads();
+  const fetcher = useCallback((signal: AbortSignal) => getWorkloads({ signal }), []);
+  const { data, error, loading, reload } = useApiResource(fetcher);
+
   return (
     <div>
       <PageHeader
         title="Workloads"
         description="AI compute workloads across teams in the simulated cluster."
-        meta={<MetaItem label="Total" value={String(workloads.length)} />}
+        meta={<MetaItem label="Total" value={data ? String(data.length) : "—"} />}
         actions={
           <>
             <SimulationBadge label="SIMULATION" />
@@ -26,7 +34,18 @@ export default function WorkloadsPage() {
           </>
         }
       />
-      <WorkloadsView workloads={workloads} />
+
+      {loading ? (
+        <Panel>
+          <ApiLoadingState rows={8} label="Loading workloads" />
+        </Panel>
+      ) : error || !data ? (
+        <Panel>
+          <ApiErrorState error={error!} onRetry={reload} />
+        </Panel>
+      ) : (
+        <WorkloadsView workloads={data} />
+      )}
     </div>
   );
 }

@@ -1,0 +1,116 @@
+{
+  "dataset": "Microsoft Philly GPU-cluster trace (cluster_job_log)",
+  "target": "runtime_minutes",
+  "prediction_type": "regression",
+  "unit": "minutes",
+  "n_train": 85161,
+  "n_test": 21291,
+  "split": "chronological by submitted_time (first 80% train / last 20% test)",
+  "baseline": {
+    "strategy": "train-mean",
+    "mae": 550.3203932607945,
+    "rmse": 1389.555742055672,
+    "r2": -9.11272001702379e-06
+  },
+  "baseline_median": {
+    "strategy": "train-median",
+    "mae": 355.32922752962907,
+    "rmse": 1430.2533418076691,
+    "r2": -0.059443872642000795
+  },
+  "xgboost": {
+    "config": {
+      "objective": "reg:squarederror",
+      "base_score": null,
+      "booster": null,
+      "callbacks": null,
+      "colsample_bylevel": null,
+      "colsample_bynode": null,
+      "colsample_bytree": 0.8,
+      "device": null,
+      "early_stopping_rounds": null,
+      "enable_categorical": true,
+      "eval_metric": null,
+      "feature_types": null,
+      "feature_weights": null,
+      "gamma": null,
+      "grow_policy": null,
+      "importance_type": null,
+      "interaction_constraints": null,
+      "learning_rate": 0.05,
+      "max_bin": null,
+      "max_cat_threshold": null,
+      "max_cat_to_onehot": null,
+      "max_delta_step": null,
+      "max_depth": 6,
+      "max_leaves": null,
+      "min_child_weight": 5,
+      "missing": NaN,
+      "monotone_constraints": null,
+      "multi_strategy": null,
+      "n_estimators": 400,
+      "n_jobs": 0,
+      "num_parallel_tree": null,
+      "random_state": 42,
+      "reg_alpha": null,
+      "reg_lambda": 1.0,
+      "sampling_method": null,
+      "scale_pos_weight": null,
+      "subsample": 0.8,
+      "tree_method": null,
+      "validate_parameters": null,
+      "verbosity": null
+    },
+    "mae": 356.47309328426206,
+    "rmse": 1410.9839126898132,
+    "r2": -0.031088956969326897
+  },
+  "log_space": {
+    "xgboost": {
+      "mae": 1.6743279067442152,
+      "rmse": 2.1521367473659363,
+      "r2": 0.15245944388758814
+    },
+    "baseline_mean": {
+      "mae": 2.0344453539646135,
+      "rmse": 2.3379883459269233,
+      "r2": -0.00024283004243552675
+    },
+    "space": "log1p(minutes)"
+  },
+  "improvement": {
+    "mae_pct_vs_mean": 35.224444223834,
+    "rmse_pct_vs_mean": -1.542087876405804,
+    "mae_pct_vs_median": -0.3219171590768217
+  },
+  "feature_importance": [
+    {
+      "feature": "vc_freq",
+      "importance": 0.30425864458084106
+    },
+    {
+      "feature": "gpus_per_server",
+      "importance": 0.18901097774505615
+    },
+    {
+      "feature": "is_distributed",
+      "importance": 0.14748871326446533
+    },
+    {
+      "feature": "num_gpus",
+      "importance": 0.10724621266126633
+    },
+    {
+      "feature": "submit_dow",
+      "importance": 0.1020774245262146
+    },
+    {
+      "feature": "submit_hour",
+      "importance": 0.09311152994632721
+    },
+    {
+      "feature": "num_servers",
+      "importance": 0.05680646002292633
+    }
+  ]
+}

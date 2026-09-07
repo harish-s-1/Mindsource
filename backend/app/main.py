@@ -14,15 +14,27 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
 from .config import CORS_ORIGINS, ENVIRONMENT_LABEL
-from .database import SessionLocal
-from .routers import decisions, infrastructure, schedule, workloads
+from .database import SessionLocal, apply_light_migrations
+from .routers import (
+    connectors,
+    decisions,
+    infrastructure,
+    ml,
+    recommend,
+    schedule,
+    security,
+    what_if,
+    workloads,
+)
 from .schemas import HealthOut
 from .seed import seed_if_empty
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # Ensure tables exist and seed simulated data on first run.
+    # Add any missing columns to a pre-existing DB, then ensure tables exist and
+    # seed simulated data on first run.
+    apply_light_migrations()
     db = SessionLocal()
     try:
         seed_if_empty(db)
@@ -66,3 +78,8 @@ app.include_router(infrastructure.router)
 app.include_router(workloads.router)
 app.include_router(decisions.router)
 app.include_router(schedule.router)
+app.include_router(connectors.router)
+app.include_router(security.router)
+app.include_router(ml.router)
+app.include_router(recommend.router)
+app.include_router(what_if.router)

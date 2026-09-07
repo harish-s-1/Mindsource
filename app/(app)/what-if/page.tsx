@@ -7,8 +7,8 @@ export default function WhatIfPage() {
     <div>
       <PageHeader
         title="What-if Simulator"
-        description="Evaluate how infrastructure or workload changes could affect the schedule."
-        actions={<SimulationBadge label="SIMULATION" />}
+        description="Simulate a hypothetical workload through the real MINDSource pipeline — Security, XGBoost prediction and the Decision Engine — over current infrastructure. Nothing is created or allocated."
+        actions={<SimulationBadge label="WHAT-IF SIMULATION" />}
       />
       <WhatIfSimulator />
     </div>

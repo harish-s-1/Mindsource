@@ -7,7 +7,7 @@ export default function NewWorkloadPage() {
     <div>
       <PageHeader
         title="New Workload"
-        description="Describe a workload and request a scheduling recommendation from the simulated decision layer."
+        description="Define a workload and submit it. It passes the security gate, gets an advisory XGBoost runtime prediction and a Decision Engine resource recommendation, then is stored as a queued record — it is not scheduled or assigned in this phase."
         actions={<SimulationBadge label="SIMULATION" />}
       />
       <NewWorkloadForm />

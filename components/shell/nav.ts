@@ -5,6 +5,7 @@ import {
   GitBranch,
   CalendarRange,
   FlaskConical,
+  ShieldCheck,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -22,6 +23,7 @@ export const PRIMARY_NAV: NavItem[] = [
   { href: "/decisions", label: "Decisions", icon: GitBranch },
   { href: "/schedule", label: "Schedule", icon: CalendarRange },
   { href: "/what-if", label: "What-if", icon: FlaskConical },
+  { href: "/security", label: "Security Center", icon: ShieldCheck },
 ];
 
 export const SECONDARY_NAV: NavItem[] = [
@@ -37,6 +39,7 @@ export const ROUTE_TITLES: Record<string, string> = {
   "/decisions": "Decisions",
   "/schedule": "Schedule",
   "/what-if": "What-if Simulator",
+  "/security": "Security Center",
   "/settings": "Settings",
 };
 

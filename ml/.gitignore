@@ -1,0 +1,14 @@
+# Raw and processed datasets are large / redistributable only from the source.
+data/raw/
+data/processed/
+*.tar.gz
+*.zip
+*.parquet
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Keep trained model artifacts (small) tracked so the API can run — but not data.
+!models/

@@ -29,6 +29,20 @@ class Node(Base):
     # with the frontend seed; workloads also carry a node_id back-reference).
     running_workload_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
 
+    # --- Provenance / live-telemetry fields --------------------------------
+    # "simulated" for the seeded demo fleet; a connector name (e.g. "nvidia-smi")
+    # for nodes populated from real telemetry. Lets the UI distinguish LIVE vs
+    # SIMULATED infrastructure and drive heartbeat/online status.
+    source: Mapped[str] = mapped_column(String, nullable=False, default="simulated")
+    hostname: Mapped[str | None] = mapped_column(String, nullable=True)
+    gpu_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    memory_total_mb: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    memory_used_mb: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    temperature_c: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # ISO 8601 timestamp of the most recent telemetry (heartbeat). Null for
+    # simulated nodes, which have no connector reporting in.
+    last_seen: Mapped[str | None] = mapped_column(String, nullable=True)
+
 
 class Workload(Base):
     __tablename__ = "workloads"

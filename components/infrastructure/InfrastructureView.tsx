@@ -13,7 +13,8 @@ import { UtilizationBar } from "@/components/ui/UtilizationBar";
 import { EmptyState } from "@/components/ui/States";
 import { nodeStatusTone } from "@/components/ui/tone";
 import { NodeDrawer } from "./NodeDrawer";
-import type { GpuType, Node, NodeStatus } from "@/lib/types";
+import { SourceBadge } from "./SourceBadge";
+import type { GpuType, Node, NodeStatus, Workload } from "@/lib/types";
 
 const GPU_TYPES: Array<GpuType | "All"> = ["All", "H100", "A100", "L4", "T4"];
 const STATUSES: Array<NodeStatus | "All"> = [
@@ -22,11 +23,19 @@ const STATUSES: Array<NodeStatus | "All"> = [
   "Degraded",
   "Offline",
 ];
+const SOURCES = ["All", "Simulated", "Live"];
 
-export function InfrastructureView({ nodes }: { nodes: Node[] }) {
+export function InfrastructureView({
+  nodes,
+  workloads,
+}: {
+  nodes: Node[];
+  workloads: Workload[];
+}) {
   const [search, setSearch] = useState("");
   const [gpuType, setGpuType] = useState("All");
   const [status, setStatus] = useState("All");
+  const [source, setSource] = useState("All");
   const [selected, setSelected] = useState<Node | null>(null);
 
   const filtered = useMemo(() => {
@@ -34,11 +43,13 @@ export function InfrastructureView({ nodes }: { nodes: Node[] }) {
     return nodes.filter((n) => {
       if (gpuType !== "All" && n.gpuType !== gpuType) return false;
       if (status !== "All" && n.status !== status) return false;
+      if (source === "Simulated" && n.source !== "simulated") return false;
+      if (source === "Live" && n.source === "simulated") return false;
       if (q && !n.name.toLowerCase().includes(q) && !n.region.toLowerCase().includes(q))
         return false;
       return true;
     });
-  }, [nodes, search, gpuType, status]);
+  }, [nodes, search, gpuType, status, source]);
 
   const columns: Column<Node>[] = [
     {
@@ -52,6 +63,11 @@ export function InfrastructureView({ nodes }: { nodes: Node[] }) {
       ),
     },
     { key: "gpuType", header: "GPU Type", render: (n) => <span className="font-medium">{n.gpuType}</span> },
+    {
+      key: "source",
+      header: "Source",
+      render: (n) => <SourceBadge source={n.source} liveStatus={n.liveStatus} />,
+    },
     { key: "total", header: "Total", align: "right", numeric: true, render: (n) => n.totalGpus },
     { key: "alloc", header: "Allocated", align: "right", numeric: true, render: (n) => n.allocatedGpus },
     {
@@ -91,6 +107,7 @@ export function InfrastructureView({ nodes }: { nodes: Node[] }) {
             className="w-64"
           />
           <div className="flex-1" />
+          <FilterSelect label="Source" value={source} onChange={setSource} options={SOURCES} />
           <FilterSelect label="GPU type" value={gpuType} onChange={setGpuType} options={GPU_TYPES} />
           <FilterSelect label="Status" value={status} onChange={setStatus} options={STATUSES} />
         </FilterBar>
@@ -115,7 +132,11 @@ export function InfrastructureView({ nodes }: { nodes: Node[] }) {
         </div>
       </Panel>
 
-      <NodeDrawer node={selected} onClose={() => setSelected(null)} />
+      <NodeDrawer
+        node={selected}
+        workloads={workloads}
+        onClose={() => setSelected(null)}
+      />
     </>
   );
 }

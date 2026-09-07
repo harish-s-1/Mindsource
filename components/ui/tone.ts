@@ -3,9 +3,25 @@ import type {
   DecisionType,
   NodeStatus,
   Priority,
+  RiskLevel,
+  Severity,
   WorkloadStatus,
 } from "@/lib/types";
 import type { BadgeTone } from "./StatusBadge";
+
+// Shared mapping for security severity and risk levels (same scale).
+export function severityTone(level: Severity | RiskLevel): BadgeTone {
+  switch (level) {
+    case "CRITICAL":
+      return "critical";
+    case "HIGH":
+      return "warning";
+    case "MEDIUM":
+      return "accent";
+    case "LOW":
+      return "healthy";
+  }
+}
 
 export function workloadStatusTone(status: WorkloadStatus): BadgeTone {
   switch (status) {
