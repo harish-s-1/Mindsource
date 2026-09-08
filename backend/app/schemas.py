@@ -424,6 +424,101 @@ class WhatIfResponse(BaseModel):
     recommendation: Optional[DecisionRecommendationOut] = None
 
 
+# --- Execution controller (Phase 4) ----------------------------------------
+# Only these predefined, safe GPU workloads may be launched by a node agent.
+ExecutionWorkloadType = Literal["gpu_benchmark", "matrix_multiply", "cuda_stress"]
+ExecutionState = Literal[
+    "QUEUED",
+    "ASSIGNED",
+    "RUNNING",
+    "COMPLETED",
+    "FAILED",
+    "NO_ELIGIBLE_GPU",
+    "BLOCKED",
+]
+
+
+class ExecutionRequest(BaseModel):
+    """Request to route + launch a predefined workload on the best REAL GPU."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    workload_name: str = Field(min_length=1, max_length=120)
+    workload_type: ExecutionWorkloadType
+    gpu_requested: int = Field(default=1, ge=1, le=8)
+    memory_mb: int = Field(default=0, ge=0, le=1_000_000)  # VRAM need; 0 = unspecified
+    duration_seconds: int = Field(default=30, ge=1, le=600)
+    # Security posture (safe defaults) — the same gate as workload creation.
+    image: Optional[str] = None
+    privileged: bool = False
+    host_network: bool = False
+    host_pid: bool = False
+    host_path_mounts: bool = False
+    capabilities: list[str] = Field(default_factory=list)
+
+
+class ExecutionCandidateOut(BaseModel):
+    node_id: str
+    name: str
+    gpu_name: str
+    total_vram_mb: int
+    available_vram_mb: int
+    utilization: int
+    online: bool
+    eligible: bool
+    score: float
+    reasons: list[str] = Field(default_factory=list)
+
+
+class ExecutionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    workload_name: str
+    workload_type: str
+    gpu_requested: int
+    memory_mb: int
+    duration_seconds: int
+    state: ExecutionState
+    selected_node_id: Optional[str] = None
+    selected_gpu_name: Optional[str] = None
+    reason: Optional[str] = None
+    explanation: list[str] = Field(default_factory=list)
+    candidates: list[ExecutionCandidateOut] = Field(default_factory=list)
+    device: Optional[str] = None
+    last_utilization: Optional[int] = None
+    error: Optional[str] = None
+    created_at: str
+    assigned_at: Optional[str] = None
+    started_at: Optional[str] = None
+    finished_at: Optional[str] = None
+    # The security gate result (BLOCK stops before selection/execution).
+    security: Optional[SecurityScanResult] = None
+
+
+# --- Node agent (pull model) -----------------------------------------------
+class AgentClaimRequest(BaseModel):
+    node_id: str = Field(min_length=1, max_length=128)
+
+
+class AgentJob(BaseModel):
+    execution_id: str
+    workload_type: ExecutionWorkloadType
+    duration_seconds: int
+
+
+class AgentClaimResponse(BaseModel):
+    job: Optional[AgentJob] = None
+
+
+class AgentUpdateRequest(BaseModel):
+    execution_id: str
+    state: Literal["RUNNING", "COMPLETED", "FAILED"]
+    device: Optional[str] = None
+    utilization: Optional[int] = Field(default=None, ge=0, le=100)
+    error: Optional[str] = Field(default=None, max_length=500)
+
+
 # --- Health ----------------------------------------------------------------
 class HealthOut(BaseModel):
     status: Literal["ok"]

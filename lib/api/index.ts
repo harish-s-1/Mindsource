@@ -6,4 +6,5 @@ export type {
   WorkloadCreateRequest,
   SecurityScanRequest,
   WhatIfRequestBody,
+  ExecutionRequestBody,
 } from "./types";

@@ -130,6 +130,57 @@ export interface WhatIfResult {
   recommendation: ResourceRecommendation | null;
 }
 
+// --- Execution controller (Phase 4) ----------------------------------------
+export type ExecutionWorkloadType =
+  | "gpu_benchmark"
+  | "matrix_multiply"
+  | "cuda_stress";
+
+export type ExecutionState =
+  | "QUEUED"
+  | "ASSIGNED"
+  | "RUNNING"
+  | "COMPLETED"
+  | "FAILED"
+  | "NO_ELIGIBLE_GPU"
+  | "BLOCKED";
+
+export interface ExecutionCandidate {
+  nodeId: string;
+  name: string;
+  gpuName: string;
+  totalVramMb: number;
+  availableVramMb: number;
+  utilization: number;
+  online: boolean;
+  eligible: boolean;
+  score: number;
+  reasons: string[];
+}
+
+export interface Execution {
+  id: string;
+  workloadName: string;
+  workloadType: string;
+  gpuRequested: number;
+  memoryMb: number;
+  durationSeconds: number;
+  state: ExecutionState;
+  selectedNodeId: string | null;
+  selectedGpuName: string | null;
+  reason: string | null;
+  explanation: string[];
+  candidates: ExecutionCandidate[];
+  device: string | null;
+  lastUtilization: number | null;
+  error: string | null;
+  createdAt: string;
+  assignedAt: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  security: SecurityScanResult | null;
+}
+
 // --- ML runtime prediction (Phase 3B/3C) -----------------------------------
 export interface MLPrediction {
   model: string; // e.g. "XGBoost"

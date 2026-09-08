@@ -87,3 +87,38 @@ class Decision(Base):
     # factors: list[{label, value, weight}]; rationale: list[str]
     factors: Mapped[list | None] = mapped_column(JSON, nullable=True)
     rationale: Mapped[list | None] = mapped_column(JSON, nullable=True)
+
+
+class Execution(Base):
+    """A controlled workload execution routed to a REAL GPU node (Phase 4).
+
+    Tracks the lifecycle QUEUED -> ASSIGNED -> RUNNING -> COMPLETED/FAILED (or
+    the terminal NO_ELIGIBLE_GPU when no real GPU can satisfy the workload).
+    The node agent claims ASSIGNED jobs for its node_id and reports state back.
+    """
+
+    __tablename__ = "executions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    workload_name: Mapped[str] = mapped_column(String, nullable=False)
+    workload_type: Mapped[str] = mapped_column(String, nullable=False)  # allowlist
+    gpu_requested: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    memory_mb: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    duration_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+
+    state: Mapped[str] = mapped_column(String, nullable=False)
+    selected_node_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    selected_gpu_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    explanation: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    candidates: Mapped[list | None] = mapped_column(JSON, nullable=True)
+
+    # Reported by the agent while/after running (never fabricated backend-side).
+    device: Mapped[str | None] = mapped_column(String, nullable=True)  # "cuda"/"cpu"
+    last_utilization: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    created_at: Mapped[str] = mapped_column(String, nullable=False)  # ISO 8601
+    assigned_at: Mapped[str | None] = mapped_column(String, nullable=True)
+    started_at: Mapped[str | None] = mapped_column(String, nullable=True)
+    finished_at: Mapped[str | None] = mapped_column(String, nullable=True)

@@ -752,6 +752,140 @@ def test_whatif_model_unavailable_no_fabricated_prediction() -> None:
         ml_service.reset_cache()
 
 
+# --- Execution controller (Phase 4) ----------------------------------------
+from app.decision_engine import RealGpuNode, select_real_gpu  # noqa: E402
+
+
+def _rgn(node_id, name, total, avail, util, online=True, gpus_avail=1):
+    return RealGpuNode(
+        node_id=node_id, name=node_id.upper(), gpu_name=name,
+        total_vram_mb=total, available_vram_mb=avail, utilization=util,
+        gpus_total=1, gpus_available=gpus_avail, online=online,
+    )
+
+
+def test_select_real_small_prefers_smaller_vram() -> None:
+    # Small job fits both -> pick the smaller-VRAM GPU (preserve the larger).
+    n3050 = _rgn("harish-rtx3050", "RTX 3050", 4096, 3596, 5)
+    n4050 = _rgn("friend-rtx4050", "RTX 4050", 6144, 5344, 10)
+    sel = select_real_gpu([n3050, n4050], workload_vram_mb=1500)
+    assert sel.selected_node_id == "harish-rtx3050"
+
+
+def test_select_real_large_excludes_insufficient_vram() -> None:
+    n3050 = _rgn("harish-rtx3050", "RTX 3050", 4096, 3596, 5)
+    n4050 = _rgn("friend-rtx4050", "RTX 4050", 6144, 5344, 10)
+    sel = select_real_gpu([n3050, n4050], workload_vram_mb=5000)
+    assert sel.selected_node_id == "friend-rtx4050"
+    ineligible = [c for c in sel.candidates if not c.eligible]
+    assert any(c.node_id == "harish-rtx3050" for c in ineligible)
+
+
+def test_select_real_offline_not_eligible() -> None:
+    online = _rgn("a", "RTX 4050", 6144, 5000, 5, online=True)
+    offline = _rgn("b", "RTX 3050", 4096, 4000, 5, online=False)
+    sel = select_real_gpu([offline, online], workload_vram_mb=1000)
+    assert sel.selected_node_id == "a"
+    off = next(c for c in sel.candidates if c.node_id == "b")
+    assert off.eligible is False and "offline" in off.reasons[0].lower()
+
+
+def test_select_real_none_eligible_returns_null() -> None:
+    n = _rgn("a", "RTX 3050", 4096, 1000, 90)
+    sel = select_real_gpu([n], workload_vram_mb=8000)  # needs more than free
+    assert sel.selected_node_id is None
+    assert any("No real GPU" in e for e in sel.explanation)
+
+
+def test_select_real_deterministic() -> None:
+    nodes = [_rgn("a", "RTX 3050", 4096, 3000, 5), _rgn("b", "RTX 4050", 6144, 5000, 5)]
+    a = select_real_gpu(nodes, 2000)
+    b = select_real_gpu(nodes, 2000)
+    assert a.selected_node_id == b.selected_node_id
+    assert [c.score for c in a.candidates] == [c.score for c in b.candidates]
+
+
+def _inject_real_node(node_id, host, name, total, used, util):
+    return client.post("/api/connectors/gpu/telemetry", json={
+        "source": "nvidia-smi", "node_id": node_id, "hostname": host,
+        "gpus": [{"index": 0, "name": name, "memory_total_mb": total,
+                  "memory_used_mb": used, "memory_free_mb": total - used,
+                  "utilization_percent": util, "temperature_c": 50}],
+    })
+
+
+def test_execution_no_eligible_gpu() -> None:
+    # Huge VRAM request: no real node can satisfy it -> NO_ELIGIBLE_GPU (honest).
+    r = client.post("/api/execution", json={
+        "workload_name": "impossible", "workload_type": "gpu_benchmark",
+        "memory_mb": 900000, "duration_seconds": 5})
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["state"] == "NO_ELIGIBLE_GPU"
+    assert body["selected_node_id"] is None
+    assert body["reason"]
+
+
+def test_execution_security_block_prevents_execution() -> None:
+    r = client.post("/api/execution", json={
+        "workload_name": "evil", "workload_type": "gpu_benchmark",
+        "memory_mb": 1000, "privileged": True})
+    body = r.json()
+    assert body["state"] == "BLOCKED"
+    assert body["security"]["status"] == "BLOCK"
+    assert body["selected_node_id"] is None
+
+
+def test_execution_routes_and_agent_lifecycle() -> None:
+    _inject_real_node("harish-rtx3050", "HARISH", "NVIDIA GeForce RTX 3050 Laptop GPU", 4096, 500, 5)
+    _inject_real_node("friend-rtx4050", "FRIEND", "NVIDIA GeForce RTX 4050 Laptop GPU", 6144, 800, 10)
+    workloads_before = len(client.get("/api/workloads").json())
+
+    # Small job -> RTX 3050 (right-sized, preserves 4050).
+    created = client.post("/api/execution", json={
+        "workload_name": "small-bench", "workload_type": "gpu_benchmark",
+        "memory_mb": 2048, "duration_seconds": 5}).json()
+    assert created["state"] == "ASSIGNED"
+    assert created["selected_node_id"] == "harish-rtx3050"
+    assert created["security"]["status"] == "PASS"
+    exec_id = created["id"]
+
+    # Agent claims -> RUNNING.
+    claim = client.post("/api/execution/agent/claim", json={"node_id": "harish-rtx3050"}).json()
+    assert claim["job"]["execution_id"] == exec_id
+    assert client.get(f"/api/execution/{exec_id}").json()["state"] == "RUNNING"
+
+    # Agent completes with real device label.
+    client.post("/api/execution/agent/update", json={
+        "execution_id": exec_id, "state": "RUNNING", "device": "cuda", "utilization": 91})
+    done = client.post("/api/execution/agent/update", json={
+        "execution_id": exec_id, "state": "COMPLETED", "utilization": 0}).json()
+    assert done["state"] == "COMPLETED" and done["device"] == "cuda"
+    assert done["finished_at"]
+
+    # Execution does not create workloads.
+    assert len(client.get("/api/workloads").json()) == workloads_before
+
+    # Large job -> RTX 4050 (3050 has insufficient VRAM).
+    big = client.post("/api/execution", json={
+        "workload_name": "big-bench", "workload_type": "cuda_stress",
+        "memory_mb": 5000, "duration_seconds": 5}).json()
+    assert big["selected_node_id"] == "friend-rtx4050"
+
+
+def test_execution_agent_reports_failure() -> None:
+    # An assigned execution that the agent reports as FAILED must show FAILED —
+    # never faked as success.
+    created = client.post("/api/execution", json={
+        "workload_name": "willfail", "workload_type": "matrix_multiply",
+        "memory_mb": 1000, "duration_seconds": 5}).json()
+    assert created["state"] == "ASSIGNED"  # a real node is online from prior tests
+    r = client.post("/api/execution/agent/update", json={
+        "execution_id": created["id"], "state": "FAILED", "error": "CUDA out of memory"}).json()
+    assert r["state"] == "FAILED"
+    assert r["error"] == "CUDA out of memory"
+
+
 def _run_all() -> None:
     # Preserve definition order (matches pytest) so mutating tests run after the
     # count-based checks that depend on the pristine seed.

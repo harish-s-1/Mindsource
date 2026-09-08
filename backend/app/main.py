@@ -18,6 +18,7 @@ from .database import SessionLocal, apply_light_migrations
 from .routers import (
     connectors,
     decisions,
+    execution,
     infrastructure,
     ml,
     recommend,
@@ -83,3 +84,4 @@ app.include_router(security.router)
 app.include_router(ml.router)
 app.include_router(recommend.router)
 app.include_router(what_if.router)
+app.include_router(execution.router)

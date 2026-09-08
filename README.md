@@ -4,12 +4,14 @@ An enterprise operational console that turns GPU-cluster telemetry and workload
 requests into **explainable resource intelligence**. MINDSource is a decision
 layer — it advises an existing scheduler, it does not replace Kubernetes/Slurm.
 
-Its core pipeline, applied identically to real submissions and to what-if
-simulations:
+Its core pipeline — **Observe → Secure → Predict → Optimize → Execute → Explain**
+— applied identically to real submissions, what-if simulations, and automatic
+real-GPU execution:
 
 ```
-Workload → Security Engine → XGBoost prediction → Decision Engine → Recommendation → Why?
-              "allowed?"        "what behavior?"      "best fit?"        "explain it"
+Observe        Secure           Predict            Optimize          Execute            Explain
+telemetry → Security Engine → XGBoost prediction → Decision Engine → Execution → "why this GPU?"
+             "allowed?"        "what behavior?"     "best fit?"      "run it"
 ```
 
 > **Honesty first.** The GPU fleet (H100/A100/L4/T4) is **simulated** demo data
@@ -52,6 +54,41 @@ Workload → Security → XGBoost → Decision Engine → Recommendation (+ What
   human-readable reasons.
 - **What-if simulator** — runs a hypothetical workload through the *same* real
   pipeline with **no persistence**.
+- **Automatic real-GPU execution** — routes a predefined, allowlisted workload
+  to the best-fit **real** GPU node (e.g. RTX 3050 vs RTX 4050) by VRAM /
+  availability / utilization scoring, then a **node agent** on that machine
+  launches it and reports live state. Multiple laptops register independently
+  via `MINDSOURCE_NODE_ID`.
+
+### Implemented vs simulated vs not-implemented
+
+**Implemented (real):** NVIDIA `nvidia-smi` telemetry · security gate · XGBoost
+prediction · Decision Engine · automatic real-GPU **selection** · controlled,
+allowlisted GPU **execution** via a pull-based node agent.
+
+**Simulated (demo):** the 64-GPU H100/A100/L4/T4 pools, their metrics/schedule,
+and cloud cost.
+
+**Not implemented:** Kubernetes/Slurm/cloud integration; production remote
+execution/auth; and **true live migration of a running process between GPUs**.
+Here, "automatic GPU switching" means *automatic workload placement onto the
+most suitable available GPU **before** execution* — not mid-run migration.
+
+### Two real GPU nodes (agent)
+
+The connector is **outbound-only**. Execution uses a **pull model**: the backend
+enqueues a job for the selected `node_id`; each machine's agent polls for its
+job, runs an allowlisted workload locally (real GPU load via PyTorch+CUDA, else
+an honest CPU fallback labelled `device: cpu`), and reports back. No inbound
+server, no arbitrary remote shell.
+
+```bash
+# on each laptop with an NVIDIA GPU (point API_URL at the backend's LAN IP)
+cd connector
+MINDSOURCE_NODE_ID=harish-rtx3050  MINDSOURCE_API_URL=http://<backend-ip>:8000  python node_agent.py
+# friend's machine:
+MINDSOURCE_NODE_ID=friend-rtx4050  MINDSOURCE_API_URL=http://<backend-ip>:8000  python node_agent.py
+```
 
 ## Repository layout
 
@@ -94,7 +131,7 @@ out of the box. To retrain from the real dataset, see [`ml/README.md`](ml/README
 ## Tests
 
 ```bash
-cd backend && python -m tests.test_smoke     # full backend suite (57 checks)
+cd backend && python -m tests.test_smoke     # full backend suite (66 checks)
 cd ../ml   && python -m tests.test_pipeline  # ML pipeline checks
 ```
 ```bash

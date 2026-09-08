@@ -10,6 +10,7 @@ import {
   mapMlPrediction,
   mapRecommendation,
   mapWhatIf,
+  mapExecution,
   mapNode,
   mapSchedule,
   mapSecurityPolicy,
@@ -25,6 +26,8 @@ import type {
   DecisionRecommendRequestBody,
   WhatIfRequestBody,
   WhatIfResponseBody,
+  ExecutionRequestBody,
+  ExecutionResponse,
   InfrastructureResponse,
   MLPredictionResponse,
   MLPredictRequestBody,
@@ -45,6 +48,7 @@ import type {
   Node,
   ResourceRecommendation,
   WhatIfResult,
+  Execution,
   ScheduleData,
   SecurityPolicy,
   SecurityScanResult,
@@ -156,6 +160,20 @@ export async function runWhatIf(
   opts?: Opts,
 ): Promise<WhatIfResult> {
   return mapWhatIf(await apiPost<WhatIfResponseBody>("/api/what-if", body, opts));
+}
+
+// --- Execution controller (Phase 4) ----------------------------------------
+export async function createExecution(
+  body: ExecutionRequestBody,
+  opts?: Opts,
+): Promise<Execution> {
+  return mapExecution(await apiPost<ExecutionResponse>("/api/execution", body, opts));
+}
+
+export async function getExecution(id: string, opts?: Opts): Promise<Execution> {
+  return mapExecution(
+    await apiGet<ExecutionResponse>(`/api/execution/${encodeURIComponent(id)}`, opts),
+  );
 }
 
 // If an error is a security-gate BLOCK from POST /api/workloads (403 with a

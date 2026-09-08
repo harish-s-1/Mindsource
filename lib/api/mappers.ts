@@ -15,6 +15,8 @@ import type {
   ScheduleBlock,
   ScheduleData,
   MLPrediction,
+  Execution,
+  ExecutionCandidate,
   ResourceRecommendation,
   SchedulePool,
   SecurityPolicy,
@@ -40,6 +42,8 @@ import type {
   SecurityPolicyResponse,
   SecurityScanResponse,
   SecurityViolationResponse,
+  ExecutionCandidateResponse,
+  ExecutionResponse,
   WhatIfResponseBody,
   WorkloadResponse,
 } from "./types";
@@ -186,6 +190,46 @@ export function mapWhatIf(r: WhatIfResponseBody): WhatIfResult {
     recommendation: r.recommendation
       ? mapRecommendation(r.recommendation)
       : null,
+  };
+}
+
+function mapExecutionCandidate(c: ExecutionCandidateResponse): ExecutionCandidate {
+  return {
+    nodeId: c.node_id,
+    name: c.name,
+    gpuName: c.gpu_name,
+    totalVramMb: c.total_vram_mb,
+    availableVramMb: c.available_vram_mb,
+    utilization: c.utilization,
+    online: c.online,
+    eligible: c.eligible,
+    score: c.score,
+    reasons: c.reasons ?? [],
+  };
+}
+
+export function mapExecution(r: ExecutionResponse): Execution {
+  return {
+    id: r.id,
+    workloadName: r.workload_name,
+    workloadType: r.workload_type,
+    gpuRequested: r.gpu_requested,
+    memoryMb: r.memory_mb,
+    durationSeconds: r.duration_seconds,
+    state: r.state,
+    selectedNodeId: r.selected_node_id,
+    selectedGpuName: r.selected_gpu_name,
+    reason: r.reason,
+    explanation: r.explanation ?? [],
+    candidates: (r.candidates ?? []).map(mapExecutionCandidate),
+    device: r.device,
+    lastUtilization: r.last_utilization,
+    error: r.error,
+    createdAt: r.created_at,
+    assignedAt: r.assigned_at,
+    startedAt: r.started_at,
+    finishedAt: r.finished_at,
+    security: r.security ? mapSecurityScanResult(r.security) : null,
   };
 }
 

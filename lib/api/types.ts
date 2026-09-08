@@ -156,6 +156,61 @@ export interface WhatIfResponseBody {
   recommendation: DecisionRecommendationResponse | null;
 }
 
+// --- Execution controller (Phase 4) ----------------------------------------
+export interface ExecutionRequestBody {
+  workload_name: string;
+  workload_type: "gpu_benchmark" | "matrix_multiply" | "cuda_stress";
+  gpu_requested?: number;
+  memory_mb: number;
+  duration_seconds: number;
+  image?: string;
+  privileged?: boolean;
+  host_network?: boolean;
+}
+
+export interface ExecutionCandidateResponse {
+  node_id: string;
+  name: string;
+  gpu_name: string;
+  total_vram_mb: number;
+  available_vram_mb: number;
+  utilization: number;
+  online: boolean;
+  eligible: boolean;
+  score: number;
+  reasons: string[];
+}
+
+export interface ExecutionResponse {
+  id: string;
+  workload_name: string;
+  workload_type: string;
+  gpu_requested: number;
+  memory_mb: number;
+  duration_seconds: number;
+  state:
+    | "QUEUED"
+    | "ASSIGNED"
+    | "RUNNING"
+    | "COMPLETED"
+    | "FAILED"
+    | "NO_ELIGIBLE_GPU"
+    | "BLOCKED";
+  selected_node_id: string | null;
+  selected_gpu_name: string | null;
+  reason: string | null;
+  explanation: string[];
+  candidates: ExecutionCandidateResponse[];
+  device: string | null;
+  last_utilization: number | null;
+  error: string | null;
+  created_at: string;
+  assigned_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  security: SecurityScanResponse | null;
+}
+
 // --- ML (Phase 3B/3C) ------------------------------------------------------
 export interface MLPredictionResponse {
   model: string;

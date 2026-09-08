@@ -43,6 +43,24 @@ REQUEST_TIMEOUT_SECONDS: float = float(
 # Identifies this connector as the telemetry source in the payload.
 SOURCE: str = os.environ.get("MINDSOURCE_SOURCE", "nvidia-smi")
 
+# --- Execution agent (Phase 4, pull model) ---------------------------------
+# The agent polls the backend for jobs assigned to this node and reports back.
+# It never opens a server or accepts inbound commands.
+EXECUTION_CLAIM_PATH: str = os.environ.get(
+    "MINDSOURCE_EXECUTION_CLAIM_PATH", "/api/execution/agent/claim"
+)
+EXECUTION_UPDATE_PATH: str = os.environ.get(
+    "MINDSOURCE_EXECUTION_UPDATE_PATH", "/api/execution/agent/update"
+)
+
 
 def telemetry_url() -> str:
     return f"{API_URL}{TELEMETRY_PATH}"
+
+
+def claim_url() -> str:
+    return f"{API_URL}{EXECUTION_CLAIM_PATH}"
+
+
+def update_url() -> str:
+    return f"{API_URL}{EXECUTION_UPDATE_PATH}"

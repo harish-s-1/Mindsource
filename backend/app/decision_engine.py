@@ -228,3 +228,154 @@ def tier_for(gpu_type: str) -> int:
     if gpu_type in CAPABILITY_TIER:
         return CAPABILITY_TIER[gpu_type]
     return 1
+
+
+# ===========================================================================
+# Real-GPU selection (Phase 4) — extends the engine for automatic execution
+# placement onto REAL, connector-reported GPU nodes (e.g. RTX 3050 / RTX 4050).
+#
+# This is intentionally separate from recommend() above (which ranks the
+# simulated pools by GPU count/tier). Real single-GPU laptops are constrained by
+# VRAM and liveness, so selection is VRAM-driven and never uses the datacenter
+# tier scale — RTX 3050/4050 are NOT treated as H100/A100.
+#
+# Deterministic score for an eligible node (each term in [0,1]):
+#   memory_fit = workload_vram / total_vram   (higher = snugger fit -> prefers
+#                the smallest sufficient GPU, preserving larger-VRAM GPUs)
+#   pressure   = 1 - utilization/100          (prefer idle GPUs)
+#   headroom   = available_vram / total_vram  (prefer more free memory)
+#   score = 0.50*memory_fit + 0.30*pressure + 0.20*headroom
+# Eligibility = node online AND gpu_available >= requested AND
+#               available_vram >= workload_vram (VRAM floor skipped if unknown).
+# ===========================================================================
+
+WR_FIT = 0.50
+WR_PRESSURE = 0.30
+WR_HEADROOM = 0.20
+
+
+@dataclass(frozen=True)
+class RealGpuNode:
+    node_id: str
+    name: str
+    gpu_name: str
+    total_vram_mb: int
+    available_vram_mb: int
+    utilization: int
+    gpus_total: int
+    gpus_available: int
+    online: bool
+
+
+@dataclass(frozen=True)
+class ScoredRealNode:
+    node_id: str
+    name: str
+    gpu_name: str
+    total_vram_mb: int
+    available_vram_mb: int
+    utilization: int
+    online: bool
+    eligible: bool
+    score: float
+    reasons: list[str]
+
+
+@dataclass(frozen=True)
+class RealSelection:
+    selected_node_id: Optional[str]
+    selected_gpu_name: Optional[str]
+    candidates: list[ScoredRealNode]
+    explanation: list[str]
+
+
+def _score_real(
+    n: RealGpuNode, workload_vram_mb: int, gpu_requested: int
+) -> ScoredRealNode:
+    has_gpu = n.gpus_available >= gpu_requested
+    vram_ok = workload_vram_mb <= 0 or n.available_vram_mb >= workload_vram_mb
+    eligible = n.online and has_gpu and vram_ok
+
+    if n.total_vram_mb > 0 and workload_vram_mb > 0:
+        memory_fit = min(1.0, workload_vram_mb / n.total_vram_mb)
+    else:
+        memory_fit = 0.5  # neutral when the requirement is unknown
+    pressure = 1.0 - max(0, min(100, n.utilization)) / 100.0
+    headroom = (n.available_vram_mb / n.total_vram_mb) if n.total_vram_mb > 0 else 0.0
+
+    raw = WR_FIT * memory_fit + WR_PRESSURE * pressure + WR_HEADROOM * headroom
+    score = round(raw if eligible else 0.0, 4)
+
+    reasons = _real_reasons(n, workload_vram_mb, gpu_requested, eligible)
+    return ScoredRealNode(
+        node_id=n.node_id,
+        name=n.name,
+        gpu_name=n.gpu_name,
+        total_vram_mb=n.total_vram_mb,
+        available_vram_mb=n.available_vram_mb,
+        utilization=n.utilization,
+        online=n.online,
+        eligible=eligible,
+        score=score,
+        reasons=reasons,
+    )
+
+
+def _real_reasons(
+    n: RealGpuNode, workload_vram_mb: int, gpu_requested: int, eligible: bool
+) -> list[str]:
+    if not eligible:
+        if not n.online:
+            return ["Node is offline/stale — recent telemetry not received."]
+        if n.gpus_available < gpu_requested:
+            return [f"No free GPU on this node (needs {gpu_requested})."]
+        return [
+            f"Insufficient VRAM: needs {workload_vram_mb} MB, only "
+            f"{n.available_vram_mb} MB free."
+        ]
+    reasons = [
+        f"Workload fits available VRAM: needs {workload_vram_mb} MB, "
+        f"{n.available_vram_mb} of {n.total_vram_mb} MB free."
+    ]
+    if n.utilization <= 40:
+        reasons.append(f"GPU currently available (utilization {n.utilization}%).")
+    else:
+        reasons.append(f"GPU in use (utilization {n.utilization}%).")
+    return reasons
+
+
+def select_real_gpu(
+    nodes: list[RealGpuNode],
+    workload_vram_mb: int,
+    gpu_requested: int = 1,
+) -> RealSelection:
+    """Select the best-fit REAL GPU node for a workload. Deterministic."""
+    scored = [_score_real(n, workload_vram_mb, gpu_requested) for n in nodes]
+    eligible = [s for s in scored if s.eligible]
+    # Rank: highest score, then smaller VRAM (preserve larger GPUs), then id.
+    key = lambda s: (-s.score, s.total_vram_mb, s.node_id)  # noqa: E731
+    scored_sorted = sorted(scored, key=key)
+    eligible_sorted = sorted(eligible, key=key)
+
+    if not eligible_sorted:
+        reason = (
+            "No real GPU node is online with enough free VRAM for "
+            f"{workload_vram_mb} MB."
+            if nodes
+            else "No real GPU node is connected."
+        )
+        return RealSelection(None, None, scored_sorted, [reason])
+
+    best = eligible_sorted[0]
+    exp = [
+        f"MINDSource selected {best.gpu_name} on {best.name} "
+        f"(fit score {best.score:.3f})."
+    ]
+    exp.extend(best.reasons)
+    larger = [s for s in eligible_sorted if s.total_vram_mb > best.total_vram_mb]
+    if larger:
+        exp.append(
+            f"Right-sized — preserves higher-VRAM {larger[0].gpu_name} for "
+            f"heavier workloads."
+        )
+    return RealSelection(best.node_id, best.gpu_name, scored_sorted, exp)
